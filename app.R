@@ -57,7 +57,8 @@ server <- function(input, output) {
     actionButton("go", "Generate Data")
   })
   
-  observeEvent(input$go, {
+  observeEvent({input$go
+                input$options}, {
     drv <- dbDriver("PostgreSQL")
     
     conn <- dbConnect(drv,
@@ -67,12 +68,16 @@ server <- function(input, output) {
                       password="pythonuser")
     
     if(input$options == "Specify Pfam accession ids"){
-      query <- return_spec_pfam(input$pfam_input)
-      pdb_query <- return_pdb_ids(input$pfam_input)
-      print(pdb_query)
-      rs <- dbSendQuery(conn,
-                        pdb_query)
-      data <- fetch(rs,n=-1)
+      if(input$pfam_input != ""){
+        query <- return_spec_pfam(input$pfam_input)
+        pdb_query <- return_pdb_ids(input$pfam_input)
+        print(pdb_query)
+        rs <- dbSendQuery(conn,
+                          pdb_query)
+        data <- fetch(rs,n=-1)
+        #drop columns here
+      
+      }
     }
     else{
       rs <- dbSendQuery(conn, 
@@ -88,10 +93,16 @@ server <- function(input, output) {
                                )
                         )
       data <- fetch(rs,n=-1)
+      data[1] <- NULL
+      data[5] <- NULL
+      data[5] <- NULL
+      data[6] <- NULL
+      data[7] <- NULL
+      
+      #drop columns here
     }
     # submit a statement
     # rs <- dbSendQuery(conn, "SELECT * FROM pfam_ratio")
-    print(head(data))
     
     #print(head(data))
     
