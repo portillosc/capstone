@@ -35,7 +35,19 @@ ui <- fluidPage(
       
       # Show a plot of the generated distribution
       mainPanel(
-         tags$h3("waiting to be built")
+         #tags$h3("waiting to be built")
+        tabsetPanel(
+          tabPanel(
+            "data output",
+            tableOutput("mainTable"),
+            uiOutput("downloadData")
+          ),
+          tabPanel(
+            "meta data",
+            tableOutput("metaTable"),
+            uiOutput("downloadMData")
+          )
+        )
       )
    )
 )
@@ -57,8 +69,17 @@ server <- function(input, output) {
     actionButton("go", "Generate Data")
   })
   
-  observeEvent({input$go
-                input$options}, {
+  # # give the main download button a function
+  # output$data <- downloadHandler(
+  #   filename = function() {
+  #     paste('data-', Sys.Date(), '.csv', sep='')
+  #     },
+  #   content = function(con) {
+  #     write.csv(mtcars, con)
+  #     }
+  #   )
+  
+  observeEvent(input$go, {
     drv <- dbDriver("PostgreSQL")
     
     conn <- dbConnect(drv,
@@ -71,15 +92,17 @@ server <- function(input, output) {
       if(input$pfam_input != ""){
         query <- return_spec_pfam(input$pfam_input)
         pdb_query <- return_pdb_ids(input$pfam_input)
-        print(pdb_query)
         rs <- dbSendQuery(conn,
                           pdb_query)
         data <- fetch(rs,n=-1)
         #drop columns here
-      
+        split <- strsplit(input$pfam_input,"\\s+")
+        full_split <- unlist(split)
+        num_structs_per_pfam <- input$struc_num / length(full_split)
       }
     }
     else{
+      req(input$pfam_num)
       rs <- dbSendQuery(conn, 
                         paste0("WITH temp_data as (SELECT DISTINCT pfam_id FROM pfam_ratio WHERE pdb_exists != 0), ",
                                "ids AS (select pfam_id from temp_data ORDER BY RANDOM() LIMIT ",
@@ -99,12 +122,79 @@ server <- function(input, output) {
       data[6] <- NULL
       data[7] <- NULL
       
-      #drop columns here
+      
+      # calculate the right number of structures per pfam
+      num_structs_per_pfam <- input$struc_num / input$pfam_num
     }
     # submit a statement
     # rs <- dbSendQuery(conn, "SELECT * FROM pfam_ratio")
     
+    # create output dataframe
+    outputData <- data.frame(pfam_id=character(),
+                         pdb_exists=integer(),
+                         total_seqs=integer(),
+                         ratio=integer(),
+                         uniprot_id=character(),
+                         pdb_id=character())
+    
+    pfams <- unique(data$pfam_id)
+    for(value in pfams){
+      filtered_data <- data[data$pfam_id == value,]
+      
+      if(nrow(filtered_data) > num_structs_per_pfam){
+        add_in <- filtered_data[sample(nrow(filtered_data),num_structs_per_pfam), ]
+      }
+      else{
+        add_in <- filtered_data
+      }
+      outputData <- rbind(outputData,add_in)
+    }
+    
+    metaData <- outputData
+    
+    outputData[2] <- NULL
+    outputData[2] <- NULL
+    outputData[2] <- NULL
+    outputData[2] <- NULL
+    
+    metaData[5] <- NULL
+    metaData[5] <- NULL
+    
+    metaData <- unique(metaData)
+    
+    tableOutput <- outputData
+    
+    metaData$pdb_exists <- as.integer(metaData$pdb_exists)
+    metaData$total_seqs <- as.integer(metaData$total_seqs)
+    
+    #print out metadata
+    output$metaTable <- renderTable(metaData, digits=7)
+    output$downloadMData <- renderUI({
+      downloadButton("downloadMain2", "Download meta data")
+    })
+    output$downloadMain2 <- downloadHandler(
+      filename = "pdb_ids.csv",
+      content = function(file) {
+        write.table(metaData, file, row.names = FALSE, sep=",")
+      }
+    )
+    
     #print(head(data))
+    output$mainTable <- renderTable({
+      tableOutput
+    })
+    output$downloadData <- renderUI({
+      downloadButton("downloadMain", "Download PDB ids")
+    })
+    
+    outputData[1] <- NULL
+    
+    output$downloadMain <- downloadHandler(
+      filename = "pdb_ids.csv",
+      content = function(file) {
+        write.table(outputData, file, row.names = FALSE, col.names = FALSE, sep=",")
+      }
+    )
     
     dbDisconnect(conn)
   })
