@@ -1,6 +1,3 @@
-
-
-
 return_spec_pfam <- function(values){
   # split up the accession numbers
   

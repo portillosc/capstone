@@ -15,7 +15,7 @@ source("functions.R")
 ui <- fluidPage(
    
    # Application title
-   titlePanel("Homology-based, Representative PDB Sampling Tool"),
+   titlePanel("Homology-based, Representative PDB Sampling Tool Version 1.0"),
    
    # Sidebar with a slider input for number of bins 
    sidebarLayout(
@@ -29,6 +29,8 @@ ui <- fluidPage(
          #numericInput("pfam_num", "Enter Number of Desired Pfam Families", value = 10, min = 1, max = 17929),
          
          numericInput("struc_num", "Enter Number of Desired Protein Structures", value = 10, min = 1, max = 25000),
+         
+         checkboxGroupInput("all", "Download all structurs for these Pfam accession numbers?", choices = c("Yes")),
          
          uiOutput("button")
       ),
@@ -138,16 +140,25 @@ server <- function(input, output) {
                          pdb_id=character())
     
     pfams <- unique(data$pfam_id)
-    for(value in pfams){
-      filtered_data <- data[data$pfam_id == value,]
-      
-      if(nrow(filtered_data) > num_structs_per_pfam){
-        add_in <- filtered_data[sample(nrow(filtered_data),num_structs_per_pfam), ]
+    if(length(input$all) == 0){
+      for(value in pfams){
+        filtered_data <- data[data$pfam_id == value,]
+        
+        if(nrow(filtered_data) > num_structs_per_pfam){
+          add_in <- filtered_data[sample(nrow(filtered_data),num_structs_per_pfam), ]
+        }
+        else{
+          add_in <- filtered_data
+        }
+        outputData <- rbind(outputData,add_in)
       }
-      else{
-        add_in <- filtered_data
+    }
+    else{
+      for(value in pfams){
+        filtered_data <- data[data$pfam_id == value,]
+        
+        outputData <- rbind(outputData,filtered_data)
       }
-      outputData <- rbind(outputData,add_in)
     }
     
     metaData <- outputData
