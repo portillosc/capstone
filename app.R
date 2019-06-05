@@ -41,13 +41,20 @@ ui <- fluidPage(
         tabsetPanel(
           tabPanel(
             "data output",
-            tableOutput("mainTable"),
-            uiOutput("downloadData")
+            tags$hr(),
+            uiOutput("downloadData"),
+            tags$hr(),
+            div(style='height:400px; width:600px; overflow-y: scroll; overflow: scroll',
+                tableOutput("mainTable"))
+            
           ),
           tabPanel(
             "meta data",
-            tableOutput("metaTable"),
-            uiOutput("downloadMData")
+            tags$hr(),
+            uiOutput("downloadMData"),
+            tags$hr(),
+            div(style='height:400px; width:600px; overflow-y: scroll; overflow: scroll',
+                tableOutput("metaTable"))
           )
         )
       )
@@ -94,10 +101,10 @@ server <- function(input, output) {
       if(input$pfam_input != ""){
         query <- return_spec_pfam(input$pfam_input)
         pdb_query <- return_pdb_ids(input$pfam_input)
-        rs <- dbSendQuery(conn,
-                          pdb_query)
+        rs <- dbSendQuery(conn, query)
         data <- fetch(rs,n=-1)
-        #drop columns here
+        print(head(data))
+        
         split <- strsplit(input$pfam_input,"\\s+")
         full_split <- unlist(split)
         num_structs_per_pfam <- input$struc_num / length(full_split)
@@ -106,25 +113,19 @@ server <- function(input, output) {
     else{
       req(input$pfam_num)
       rs <- dbSendQuery(conn, 
-                        paste0("WITH temp_data as (SELECT DISTINCT pfam_id FROM pfam_ratio WHERE pdb_exists != 0), ",
-                               "ids AS (select pfam_id from temp_data ORDER BY RANDOM() LIMIT ",
+                        paste0("WITH unique_ids as (SELECT DISTINCT pfam_id FROM all_opt), ",
+                               "ran_ids as (SELECT pfam_id FROM unique_ids ORDER BY RANDOM() LIMIT ",
                                as.character(input$pfam_num),
-                               "), ",
-                               "pfam_uni_trunc AS (select * from ids ",
-                               "INNER JOIN pfam_ratio on pfam_ratio.pfam_id = ids.pfam_id ",
-                               "INNER JOIN pfam_uni on pfam_ratio.pfam_id = pfam_uni.pfam_id ) ",
-                               "select * from pfam_uni_trunc ",
-                               "INNER JOIN pdb_uni on pfam_uni_trunc.uniprot_id = pdb_uni.uniprot_id"
+                               ") ",
+                               "select all_opt.pfam_id, all_opt.uniprot_id, all_opt.pdb_id, ",
+                               "pfam_ratio.pdb_exists, pfam_ratio.total_seqs, pfam_ratio.ratio ",
+                               "from all_opt ",
+                               "inner join ran_ids on ran_ids.pfam_id = all_opt.pfam_id ",
+                               "inner join pfam_ratio on pfam_ratio.pfam_id = all_opt.pfam_id"
                                )
                         )
       data <- fetch(rs,n=-1)
-      data[1] <- NULL
-      data[5] <- NULL
-      data[5] <- NULL
-      data[6] <- NULL
-      data[7] <- NULL
-      
-      
+  
       # calculate the right number of structures per pfam
       num_structs_per_pfam <- input$struc_num / input$pfam_num
     }
@@ -164,12 +165,12 @@ server <- function(input, output) {
     metaData <- outputData
     
     outputData[2] <- NULL
-    outputData[2] <- NULL
-    outputData[2] <- NULL
-    outputData[2] <- NULL
+    outputData[3] <- NULL
+    outputData[3] <- NULL
+    outputData[3] <- NULL
     
-    metaData[5] <- NULL
-    metaData[5] <- NULL
+    metaData[2] <- NULL
+    metaData[2] <- NULL
     
     metaData <- unique(metaData)
     
@@ -184,7 +185,7 @@ server <- function(input, output) {
       downloadButton("downloadMain2", "Download meta data")
     })
     output$downloadMain2 <- downloadHandler(
-      filename = "pdb_ids.csv",
+      filename = "metadata.csv",
       content = function(file) {
         write.table(metaData, file, row.names = FALSE, sep=",")
       }

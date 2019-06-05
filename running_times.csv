@@ -1,0 +1,5 @@
+,n_10,n_100,n_1000
+base_python,80,78,88
+pandas,.06,.06,.05
+base_sql,122,,
+sql_optimized,.44,.6,.82

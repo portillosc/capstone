@@ -5,18 +5,21 @@ return_spec_pfam <- function(values){
     split <- strsplit(values,"\\s+")
     full_split <- unlist(split)
     
-    
-    output <- "SELECT * FROM pfam_ratio WHERE"
+    output <- paste0("SELECT all_opt.pfam_id, all_opt.uniprot_id, all_opt.pdb_id, pfam_ratio.pdb_exists, pfam_ratio.total_seqs, pfam_ratio.ratio ",
+                     "FROM all_opt ",
+                     "INNER JOIN pfam_ratio on pfam_ratio.pfam_id = all_opt.pfam_id ", 
+                     "WHERE " 
+                     )
     
     count <- 0
     for (val in full_split){
       if(count > 0){
         output <- paste0(output, " OR")
       }
-      output <- paste0(output, " pfam_id = \'", val, "\'")
+      output <- paste0(output, " all_opt.pfam_id = \'", val, "\'")
       count = count + 1
     }
-    print(output)
+    
     return(output)
   }
   return("")
